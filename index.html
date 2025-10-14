@@ -653,43 +653,73 @@ Inti Peran: Sekbid 2 saat ini bertindak sebagai garda terdepan yang memastikan s
         let photos = JSON.parse(localStorage.getItem('osisPhotos')) || [];
 
         // Upload functionality
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('photo-input');
-            const titleInput = document.getElementById('photo-title');
-            const dateInput = document.getElementById('photo-date');
-            const statusDiv = document.getElementById('upload-status');
-            
-            if (fileInput.files.length === 0) {
-                showStatus('Silakan pilih foto terlebih dahulu!', 'error');
-                return;
-            }
-            
-            const title = titleInput.value || 'Dokumentasi OSIS';
-            const date = dateInput.value || new Date().toISOString().split('T')[0];
-            
-            // Process each selected file
-            Array.from(fileInput.files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const photo = {
-                        id: Date.now() + Math.random(),
-                        src: e.target.result,
-                        title: title,
-                        date: date,
-                        uploadDate: new Date().toLocaleString('id-ID')
-                    };
-                    
-                    photos.push(photo);
-                    localStorage.setItem('osisPhotos', JSON.stringify(photos));
-                    updatePhotoGallery();
-                };
-                reader.readAsDataURL(file);
-            });
-            
-            showStatus(`${fileInput.files.length} foto berhasil diupload! 🎉`, 'success');
-            
+// Upload foto ke server
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('photo-input');
+    if (input.files.length === 0) return alert('Pilih foto dulu');
+
+    for (const file of input.files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('upload_foto.php', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            console.log('Foto tersimpan:', result.url);
+        } else {
+            alert(result.error);
+        }
+    }
+
+    input.value = '';
+    loadGallery();
+});
+
+// Tampilkan galeri publik
+async function loadGallery() {
+    const res = await fetch('get_foto.php');
+    const photos = await res.json();
+    const container = document.getElementById('photo-container');
+    document.getElementById('photo-count').textContent = `Total foto: ${photos.length}`;
+
+    if (photos.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-gray-400 py-20 px-8">
+                <div class="text-6xl mb-4">📷</div>
+                <p>Belum ada foto yang diupload</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = photos.map(url => `
+        <div class="flex-shrink-0 bg-white rounded-lg shadow-md overflow-hidden" style="width: 300px;">
+            <img src="${url}" class="w-full h-48 object-cover">
+            <div class="p-4">
+                <button onclick="downloadFile('${url}', 'foto.jpg')" class="text-blue-600 text-sm font-medium">
+                    📥 Download
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function downloadFile(url, fileName) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+window.addEventListener('DOMContentLoaded', loadGallery);
+
             // Reset form
             fileInput.value = '';
             titleInput.value = '';
