@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSIS Sekbid 2</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js"></script>
     <style>
         body {
             box-sizing: border-box;
@@ -615,7 +616,100 @@ Inti Peran: Sekbid 2 saat ini bertindak sebagai garda terdepan yang memastikan s
             // Update photo gallery to show/hide delete buttons
             updatePhotoGallery();
         }
+        const SUPABASE_URL = "https://lhgwsvuakwiltivodegh.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoZ3dzdnVha3dpbHRpdm9kZWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzODQ5ODEsImV4cCI6MjA3NTk2MDk4MX0.mgBmpS1tpfME4EeckzxR0f1zg84N1FfWGnNBmfh9iG8";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    async function uploadFileToSupabase(file) {
+      const fileName = Date.now() + "_" + file.name;
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file, { upsert: true });
+
+      if (error) {
+        alert('Gagal upload: ' + error.message);
+        return null;
+      }
+
+      return ${SUPABASE_URL}/storage/v1/object/public/uploads/${fileName};
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadGallery();
+    });
+
+    async function handleUpload(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('photo-input');
+      const title = document.getElementById('photo-title').value || 'Dokumentasi';
+      const date = document.getElementById('photo-date').value || new Date().toISOString().split('T')[0];
+
+      if (fileInput.files.length === 0) {
+        alert('Pilih file terlebih dahulu!');
+        return;
+      }
+
+      for (const file of fileInput.files) {
+        const url = await uploadFileToSupabase(file);
+        if (url) {
+          await supabase.from('gallery').insert([
+            { title: title, date: date, url: url, uploaded_at: new Date().toISOString() }
+          ]);
+        }
+      }
+
+      alert('Upload selesai ✅');
+      fileInput.value = '';
+      document.getElementById('photo-title').value = '';
+      document.getElementById('photo-date').value = '';
+      loadGallery();
+    }
+
+    async function loadGallery() {
+      const { data: photos, error } = await supabase
+        .from('gallery')
+        .select('*')
+        .order('uploaded_at', { ascending: false });
+
+      const container = document.getElementById('photo-container');
+      if (!photos || photos.length === 0) {
+        container.innerHTML = `
+          <div class="text-center text-gray-500 py-10">
+            <div class="text-5xl mb-3">📷</div>
+            Belum ada foto atau video.
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = photos.map(photo => `
+        <div class="bg-white rounded-lg shadow hover:shadow-lg overflow-hidden transition w-72">
+          ${photo.url.match(/(\.mp4|\.mov|\.avi|\.wmv)$/i) ? `
+            <video controls class="w-full h-48 object-cover">
+              <source src="${photo.url}" type="video/mp4">
+            </video>` 
+          : <img src="${photo.url}" class="w-full h-48 object-cover">}
+ <div class="p-4">
+            <h3 class="font-semibold text-gray-800 truncate">${photo.title}</h3>
+            <p class="text-sm text-gray-500 mb-2">📅 ${photo.date}</p>
+            <button onclick="downloadFile('${photo.url}', '${photo.title.replace(/[^a-z0-9]/gi,'_')}')" 
+              class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+              📥 Download
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function downloadFile(url, name) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  </script>
+</head>
         // Navigation functionality
         function showSection(sectionName) {
             // Check if trying to access admin sections
